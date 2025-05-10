@@ -1,12 +1,11 @@
 package com.example.bvgserver
 
-import bvgserver.Alert
+import com.example.bvgserver.handlers.ToolHandlers
+import com.example.bvgserver.handlers.ToolRegistry
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.get
-import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.modelcontextprotocol.kotlin.sdk.*
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -57,35 +56,10 @@ fun createServer(): Server {
     )
     val server = Server(info, options)
 
-    val httpClient = HttpClient {
-        // Install content negotiation plugin for JSON serialization/deserialization
-        install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
-    }
-
-    server.addTool(
-        name = "get_locations",
-        description = """
-            Get stop information from bvg
-        """.trimIndent(),
-        inputSchema = Tool.Input(
-            properties = buildJsonObject {
-                putJsonObject("stop") {
-                    put("type", "string")
-                    put("description", "Stop name")
-                }
-            }
-        )
-    ) {
-       request ->
-        val stop = request.arguments["stop"]?.jsonPrimitive?.content
-        if (stop == null) {
-            return@addTool CallToolResult(
-                content = listOf(TextContent("The 'stop' parameter is required."))
-            )
-        }
-        val result = httpClient.getLocation(stop)
-        CallToolResult(content = listOf(TextContent(result)))
-    }
+    // Use the ToolRegistry to register all tools
+    val registry = ToolRegistry()
+    ToolHandlers(registry).initializeTools()
+    registry.initializeTools(server)
 
     return server
 }
